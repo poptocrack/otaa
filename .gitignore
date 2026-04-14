@@ -38,6 +38,20 @@ yarn-error.*
 
 app-example
 
+# Firebase
+.firebase/
+
+# Backoffice build
+apps/backoffice/dist/
+
+# Yarn
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+
 # generated native folders
 /ios
 /android
