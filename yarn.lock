@@ -4296,53 +4296,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"One Tank After Another@workspace:.":
-  version: 0.0.0-use.local
-  resolution: "One Tank After Another@workspace:."
-  dependencies:
-    "@expo/vector-icons": "npm:^15.0.3"
-    "@react-native-async-storage/async-storage": "npm:2.2.0"
-    "@react-navigation/bottom-tabs": "npm:^7.4.0"
-    "@react-navigation/elements": "npm:^2.6.3"
-    "@react-navigation/native": "npm:^7.1.8"
-    "@react-three/fiber": "npm:^9.5.0"
-    "@types/react": "npm:~19.2.10"
-    "@types/three": "npm:^0.183.1"
-    eslint: "npm:^9.25.0"
-    eslint-config-expo: "npm:~55.0.0"
-    expo: "npm:~55.0.14"
-    expo-asset: "npm:~55.0.14"
-    expo-constants: "npm:~55.0.13"
-    expo-dev-client: "npm:~55.0.26"
-    expo-file-system: "npm:~55.0.16"
-    expo-font: "npm:~55.0.6"
-    expo-gl: "npm:~55.0.13"
-    expo-haptics: "npm:~55.0.14"
-    expo-image: "npm:~55.0.8"
-    expo-linking: "npm:~55.0.12"
-    expo-router: "npm:~55.0.12"
-    expo-splash-screen: "npm:~55.0.17"
-    expo-status-bar: "npm:~55.0.5"
-    expo-symbols: "npm:~55.0.7"
-    expo-system-ui: "npm:~55.0.15"
-    expo-web-browser: "npm:~55.0.14"
-    firebase: "npm:^12.12.0"
-    react: "npm:19.2.0"
-    react-dom: "npm:19.2.0"
-    react-native: "npm:0.83.4"
-    react-native-gesture-handler: "npm:~2.30.0"
-    react-native-reanimated: "npm:4.2.1"
-    react-native-safe-area-context: "npm:~5.6.0"
-    react-native-screens: "npm:~4.23.0"
-    react-native-svg: "npm:15.15.3"
-    react-native-web: "npm:~0.21.0"
-    react-native-worklets: "npm:0.7.2"
-    three: "npm:^0.183.2"
-    typescript: "npm:~5.9.2"
-    zustand: "npm:^5.0.12"
-  languageName: unknown
-  linkType: soft
-
 "abbrev@npm:^4.0.0":
   version: 4.0.0
   resolution: "abbrev@npm:4.0.0"
@@ -9347,6 +9300,59 @@ __metadata:
     react-dom: "npm:^19.2.0"
     typescript: "npm:~5.9.2"
     vite: "npm:^6.4.0"
+  languageName: unknown
+  linkType: soft
+
+"otaa-mobile@workspace:apps/mobile":
+  version: 0.0.0-use.local
+  resolution: "otaa-mobile@workspace:apps/mobile"
+  dependencies:
+    "@expo/vector-icons": "npm:^15.0.3"
+    "@react-native-async-storage/async-storage": "npm:2.2.0"
+    "@react-navigation/bottom-tabs": "npm:^7.4.0"
+    "@react-navigation/elements": "npm:^2.6.3"
+    "@react-navigation/native": "npm:^7.1.8"
+    "@react-three/fiber": "npm:^9.5.0"
+    "@types/react": "npm:~19.2.10"
+    "@types/three": "npm:^0.183.1"
+    eslint: "npm:^9.25.0"
+    eslint-config-expo: "npm:~55.0.0"
+    expo: "npm:~55.0.14"
+    expo-asset: "npm:~55.0.14"
+    expo-constants: "npm:~55.0.13"
+    expo-dev-client: "npm:~55.0.26"
+    expo-file-system: "npm:~55.0.16"
+    expo-font: "npm:~55.0.6"
+    expo-gl: "npm:~55.0.13"
+    expo-haptics: "npm:~55.0.14"
+    expo-image: "npm:~55.0.8"
+    expo-linking: "npm:~55.0.12"
+    expo-router: "npm:~55.0.12"
+    expo-splash-screen: "npm:~55.0.17"
+    expo-status-bar: "npm:~55.0.5"
+    expo-symbols: "npm:~55.0.7"
+    expo-system-ui: "npm:~55.0.15"
+    expo-web-browser: "npm:~55.0.14"
+    firebase: "npm:^12.12.0"
+    react: "npm:19.2.0"
+    react-dom: "npm:19.2.0"
+    react-native: "npm:0.83.4"
+    react-native-gesture-handler: "npm:~2.30.0"
+    react-native-reanimated: "npm:4.2.1"
+    react-native-safe-area-context: "npm:~5.6.0"
+    react-native-screens: "npm:~4.23.0"
+    react-native-svg: "npm:15.15.3"
+    react-native-web: "npm:~0.21.0"
+    react-native-worklets: "npm:0.7.2"
+    three: "npm:^0.183.2"
+    typescript: "npm:~5.9.2"
+    zustand: "npm:^5.0.12"
+  languageName: unknown
+  linkType: soft
+
+"otaa@workspace:.":
+  version: 0.0.0-use.local
+  resolution: "otaa@workspace:."
   languageName: unknown
   linkType: soft
 
