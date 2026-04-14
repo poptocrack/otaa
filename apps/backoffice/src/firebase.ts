@@ -1,17 +1,29 @@
 import { initializeApp } from 'firebase/app';
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, type User } from 'firebase/auth';
 import { getFirestore, collection, getDocs, query, orderBy, limit, where, Timestamp } from 'firebase/firestore';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAfNsXm5e9GVJ5fK8Mnmhye-4VmSus46Yo",
-  authDomain: "otaa-2b14c.firebaseapp.com",
-  projectId: "otaa-2b14c",
-  storageBucket: "otaa-2b14c.firebasestorage.app",
-  messagingSenderId: "1002407809443",
-  appId: "1:1002407809443:web:15862070250a54a6d44a16",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
 const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
 const db = getFirestore(app);
+
+export { auth };
+
+export async function signInAdmin(email: string, password: string) {
+  return signInWithEmailAndPassword(auth, email, password);
+}
+
+export function onAuthChange(cb: (user: User | null) => void) {
+  return onAuthStateChanged(auth, cb);
+}
 
 export interface UserProfile {
   uid: string;

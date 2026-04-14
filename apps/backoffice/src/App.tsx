@@ -1,10 +1,73 @@
 import { useState, useEffect, useMemo } from 'react';
-import { fetchUsers, fetchAllRuns, fetchEvents, fetchUserRuns, type UserProfile, type RunData, type EventData } from './firebase';
+import { fetchUsers, fetchAllRuns, fetchEvents, fetchUserRuns, signInAdmin, onAuthChange, type UserProfile, type RunData, type EventData } from './firebase';
+import { Card, CardContent } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { Button } from '@/components/ui/button';
+import type { User } from 'firebase/auth';
 
-type Tab = 'overview' | 'progression' | 'gameplay' | 'users' | 'runs';
+function LoginScreen() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+
+  const handleLogin = async () => {
+    try {
+      await signInAdmin(email, password);
+    } catch {
+      setError('Invalid credentials');
+    }
+  };
+
+  return (
+    <div className="dark min-h-screen bg-background flex items-center justify-center">
+      <Card className="w-80">
+        <CardContent className="pt-6 space-y-4">
+          <h1 className="text-xl font-bold text-center">OTAA Backoffice</h1>
+          <input
+            type="email" placeholder="Email" value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="w-full px-3 py-2 bg-secondary text-foreground border border-border rounded-md text-sm"
+          />
+          <input
+            type="password" placeholder="Password" value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+            className="w-full px-3 py-2 bg-secondary text-foreground border border-border rounded-md text-sm"
+          />
+          {error && <p className="text-destructive text-sm">{error}</p>}
+          <Button className="w-full" onClick={handleLogin}>Sign In</Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
 export function App() {
-  const [tab, setTab] = useState<Tab>('overview');
+  const [authUser, setAuthUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  useEffect(() => {
+    return onAuthChange((u) => {
+      setAuthUser(u);
+      setAuthLoading(false);
+    });
+  }, []);
+
+  if (authLoading) return (
+    <div className="dark min-h-screen bg-background flex items-center justify-center">
+      <p className="text-muted-foreground">Loading...</p>
+    </div>
+  );
+
+  if (!authUser) return <LoginScreen />;
+
+  return <Dashboard />;
+}
+
+function Dashboard() {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [runs, setRuns] = useState<RunData[]>([]);
   const [events, setEvents] = useState<EventData[]>([]);
@@ -22,114 +85,351 @@ export function App() {
     if (selectedUser) fetchUserRuns(selectedUser).then(setUserRuns);
   }, [selectedUser]);
 
-  const analytics = useMemo(() => computeAnalytics(users, runs, events), [users, runs, events]);
+  const a = useMemo(() => computeAnalytics(users, runs, events), [users, runs, events]);
 
-  if (loading) return <div style={S.container}><p style={{ color: '#00ff00' }}>Loading...</p></div>;
+  if (loading) return (
+    <div className="dark min-h-screen bg-background flex items-center justify-center">
+      <p className="text-muted-foreground">Loading data...</p>
+    </div>
+  );
 
   return (
-    <div style={S.container}>
-      <h1 style={S.title}>OTAA BACKOFFICE</h1>
-      <div style={S.tabBar}>
-        {(['overview', 'progression', 'gameplay', 'users', 'runs'] as Tab[]).map((t) => (
-          <button key={t} style={{ ...S.tab, ...(tab === t ? S.tabActive : {}) }} onClick={() => setTab(t)}>
-            {t.toUpperCase()}
-          </button>
-        ))}
-      </div>
+    <div className="dark min-h-screen bg-background text-foreground">
+      <div className="max-w-7xl mx-auto p-6">
+        <h1 className="text-2xl font-bold tracking-wider mb-6">OTAA BACKOFFICE</h1>
 
-      {tab === 'overview' && <OverviewTab a={analytics} />}
-      {tab === 'progression' && <ProgressionTab a={analytics} events={events} />}
-      {tab === 'gameplay' && <GameplayTab a={analytics} />}
-      {tab === 'users' && <UsersTab users={users} selectedUser={selectedUser} setSelectedUser={setSelectedUser} userRuns={userRuns} />}
-      {tab === 'runs' && <RunsTab runs={runs} />}
+        <Tabs defaultValue="overview">
+          <TabsList className="mb-6">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="progression">Progression</TabsTrigger>
+            <TabsTrigger value="gameplay">Gameplay</TabsTrigger>
+            <TabsTrigger value="users">Users</TabsTrigger>
+            <TabsTrigger value="runs">Runs</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="overview">
+            <div className="space-y-6">
+              <Section title="Players">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <StatCard label="Total Users" value={a.totalUsers} />
+                  <StatCard label="Active 24h" value={a.activeUsersLast24h} />
+                  <StatCard label="Active 7d" value={a.activeUsersLast7d} />
+                  <StatCard label="Avg Runs/User" value={a.avgRunsPerUser} />
+                </div>
+              </Section>
+
+              <Section title="Retention (Runs per User)">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                  {Object.entries(a.usersByRunCount).map(([bucket, count]) => (
+                    <StatCard key={bucket} label={`${bucket} runs`} value={count} />
+                  ))}
+                </div>
+              </Section>
+
+              <Section title="Runs">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                  <StatCard label="Total Runs" value={a.totalRuns} />
+                  <StatCard label="Avg Score" value={a.avgScore} />
+                  <StatCard label="Avg Wave" value={a.avgWave} />
+                  <StatCard label="Avg Duration" value={`${a.avgDuration}s`} />
+                  <StatCard label="Avg Kills/Run" value={a.avgKillsPerRun} />
+                  <StatCard label="Survival Rate" value={`${a.survivalRate}%`} />
+                </div>
+              </Section>
+
+              <Section title="Mode Distribution">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {Object.entries(a.modeDistribution).map(([mode, count]) => (
+                    <StatCard key={mode} label={mode} value={`${count} (${a.totalRuns ? Math.round(count / a.totalRuns * 100) : 0}%)`} />
+                  ))}
+                </div>
+              </Section>
+
+              <Section title="Economy">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <StatCard label="Avg Scrap/Run" value={a.avgScrapPerRun} />
+                  <StatCard label="Avg Cores/Run" value={a.avgCoresPerRun} />
+                </div>
+              </Section>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="progression">
+            <div className="space-y-6">
+              <Section title="Weapon Unlock Funnel">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+                  <StatCard label="Avg Runs Before 1st Unlock" value={a.runsBeforeFirstUnlock} />
+                  <StatCard label="Users with 2+ Weapons" value={`${a.usersWithMultipleWeapons}/${a.totalUsers}`} />
+                </div>
+                {a.weaponUnlockOrder.length > 0 && (
+                  <Table>
+                    <TableHeader>
+                      <TableRow><TableHead>Weapon</TableHead><TableHead>Avg Runs to Unlock</TableHead></TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {a.weaponUnlockOrder.map((w) => (
+                        <TableRow key={w.weapon}><TableCell>{w.weapon}</TableCell><TableCell>{w.avgRuns}</TableCell></TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </Section>
+
+              <Section title="Death Wave Distribution">
+                <p className="text-sm text-muted-foreground mb-3">Average death wave: {a.avgDeathWave}</p>
+                <div className="flex gap-1 items-end h-24">
+                  {Object.entries(a.deathWaveDistribution).sort((a, b) => +a[0] - +b[0]).map(([wave, count]) => {
+                    const max = Math.max(...Object.values(a.deathWaveDistribution));
+                    return (
+                      <div key={wave} className="flex flex-col items-center flex-1">
+                        <div className="w-full bg-primary rounded-t" style={{ height: `${(count / max) * 80}px`, minHeight: 2 }} />
+                        <span className="text-[10px] text-muted-foreground mt-1">W{wave}</span>
+                        <span className="text-[10px]">{count}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Section>
+
+              <Section title="Territory Chains">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <StatCard label="Avg Chain Length" value={a.avgChainLength} />
+                  {Object.entries(a.chainDistribution).sort((a, b) => +a[0] - +b[0]).map(([chain, count]) => (
+                    <StatCard key={chain} label={`Chain ${chain}`} value={count} />
+                  ))}
+                </div>
+              </Section>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="gameplay">
+            <div className="space-y-6">
+              <Section title="Weapon Popularity & Win Rate">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Weapon</TableHead><TableHead>Usage</TableHead><TableHead>Win Rate</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {Object.entries(a.weaponPopularity).sort((a, b) => b[1] - a[1]).map(([weapon, count]) => {
+                      const wr = a.weaponWinRate[weapon];
+                      const winRate = wr ? Math.round((wr.wins / wr.total) * 100) : 0;
+                      return (
+                        <TableRow key={weapon}>
+                          <TableCell className="font-medium">{weapon}</TableCell>
+                          <TableCell>{count} ({a.totalRuns ? Math.round(count / a.totalRuns * 100) : 0}%)</TableCell>
+                          <TableCell>
+                            <Badge variant={winRate > 50 ? 'default' : 'destructive'}>{winRate}%</Badge>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </Section>
+
+              <Section title="Quests & Biomes">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <StatCard label="Avg Quests/Run" value={a.questsPerRun} />
+                  {Object.entries(a.biomeDistribution).sort((a, b) => b[1] - a[1]).map(([biome, count]) => (
+                    <StatCard key={biome} label={biome} value={count} />
+                  ))}
+                </div>
+              </Section>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="users">
+            <Section title={`Users (${users.length})`}>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>UID</TableHead><TableHead>Runs</TableHead><TableHead>Kills</TableHead>
+                    <TableHead>Best Wave</TableHead><TableHead>Best Score</TableHead><TableHead>Scrap</TableHead>
+                    <TableHead>Cores</TableHead><TableHead>Hexes</TableHead><TableHead>Weapons</TableHead>
+                    <TableHead>Last Seen</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {users.map((u) => (
+                    <TableRow key={u.uid} className={`cursor-pointer ${selectedUser === u.uid ? 'bg-accent' : ''}`}
+                      onClick={() => setSelectedUser(u.uid)}>
+                      <TableCell className="font-mono text-xs">{u.uid.slice(0, 10)}..</TableCell>
+                      <TableCell>{u.totalRuns}</TableCell>
+                      <TableCell>{u.totalKills}</TableCell>
+                      <TableCell>{u.bestWave}</TableCell>
+                      <TableCell>{u.bestScore}</TableCell>
+                      <TableCell className="text-yellow-400">{u.scrap}</TableCell>
+                      <TableCell className="text-cyan-400">{u.cores}</TableCell>
+                      <TableCell>{u.conqueredHexes}</TableCell>
+                      <TableCell>{u.unlockedWeapons?.length ?? 1}</TableCell>
+                      <TableCell className="text-xs">{u.lastSeen?.toDate?.()?.toLocaleDateString() ?? '-'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Section>
+
+            {selectedUser && (
+              <>
+                <Separator className="my-4" />
+                <Section title={`Runs — ${selectedUser.slice(0, 10)}..`}>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Mode</TableHead><TableHead>Score</TableHead><TableHead>Wave</TableHead>
+                        <TableHead>Kills</TableHead><TableHead>Lvl</TableHead><TableHead>Dur</TableHead>
+                        <TableHead>Scrap</TableHead><TableHead>OK</TableHead><TableHead>Chain</TableHead>
+                        <TableHead>Quests</TableHead><TableHead>Weapons</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {userRuns.map((r, i) => (
+                        <TableRow key={i}>
+                          <TableCell>{r.mode}</TableCell>
+                          <TableCell>{r.score}</TableCell>
+                          <TableCell>{r.wave}</TableCell>
+                          <TableCell>{r.kills}</TableCell>
+                          <TableCell>{r.level}</TableCell>
+                          <TableCell>{r.duration ? `${r.duration}s` : '-'}</TableCell>
+                          <TableCell className="text-yellow-400">{r.scrapEarned}</TableCell>
+                          <TableCell>
+                            <Badge variant={r.survived ? 'default' : 'destructive'}>
+                              {r.survived ? 'YES' : 'NO'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{r.chainCount ?? 0}</TableCell>
+                          <TableCell>{r.questsCompleted ?? 0}</TableCell>
+                          <TableCell className="text-xs">{r.equippedWeapons?.join(', ')}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </Section>
+              </>
+            )}
+          </TabsContent>
+
+          <TabsContent value="runs">
+            <Section title={`Recent Runs (${runs.length})`}>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>User</TableHead><TableHead>Mode</TableHead><TableHead>Score</TableHead>
+                    <TableHead>Wave</TableHead><TableHead>Kills</TableHead><TableHead>Dur</TableHead>
+                    <TableHead>OK</TableHead><TableHead>Diff</TableHead><TableHead>Chain</TableHead>
+                    <TableHead>Weapons</TableHead><TableHead>Time</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {runs.map((r, i) => (
+                    <TableRow key={i}>
+                      <TableCell className="font-mono text-xs">{r.uid?.slice(0, 8)}..</TableCell>
+                      <TableCell>{r.mode}</TableCell>
+                      <TableCell>{r.score}</TableCell>
+                      <TableCell>{r.wave}</TableCell>
+                      <TableCell>{r.kills}</TableCell>
+                      <TableCell>{r.duration ? `${r.duration}s` : '-'}</TableCell>
+                      <TableCell>
+                        <Badge variant={r.survived ? 'default' : 'destructive'}>
+                          {r.survived ? 'Y' : 'N'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{r.hexDifficulty ?? '-'}</TableCell>
+                      <TableCell>{r.chainCount ?? 0}</TableCell>
+                      <TableCell className="text-xs">{r.equippedWeapons?.join(', ')}</TableCell>
+                      <TableCell className="text-xs">{r.timestamp?.toDate?.()?.toLocaleString() ?? '-'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Section>
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   );
 }
 
-// --- Analytics computation ---
+// --- Components ---
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase mb-3">{title}</h2>
+      {children}
+    </div>
+  );
+}
+
+function StatCard({ label, value }: { label: string; value: string | number }) {
+  return (
+    <Card>
+      <CardContent className="pt-4 pb-3 px-4">
+        <div className="text-2xl font-bold">{value}</div>
+        <div className="text-xs text-muted-foreground mt-1">{label}</div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// --- Analytics ---
 interface Analytics {
-  totalUsers: number;
-  totalRuns: number;
-  avgScore: number;
-  avgWave: number;
-  avgDuration: number;
-  avgKillsPerRun: number;
-  survivalRate: number;
-  modeDistribution: Record<string, number>;
-  weaponPopularity: Record<string, number>;
+  totalUsers: number; totalRuns: number; avgScore: number; avgWave: number;
+  avgDuration: number; avgKillsPerRun: number; survivalRate: number;
+  modeDistribution: Record<string, number>; weaponPopularity: Record<string, number>;
   weaponWinRate: Record<string, { total: number; wins: number }>;
-  deathWaveDistribution: Record<number, number>;
-  avgDeathWave: number;
-  questsPerRun: number;
-  chainDistribution: Record<number, number>;
-  avgChainLength: number;
-  biomeDistribution: Record<string, number>;
-  runsBeforeFirstUnlock: number;
+  deathWaveDistribution: Record<number, number>; avgDeathWave: number;
+  questsPerRun: number; chainDistribution: Record<number, number>; avgChainLength: number;
+  biomeDistribution: Record<string, number>; runsBeforeFirstUnlock: number;
   weaponUnlockOrder: { weapon: string; avgRuns: number }[];
-  usersWithMultipleWeapons: number;
-  avgScrapPerRun: number;
-  avgCoresPerRun: number;
-  activeUsersLast24h: number;
-  activeUsersLast7d: number;
-  avgRunsPerUser: number;
+  usersWithMultipleWeapons: number; avgScrapPerRun: number; avgCoresPerRun: number;
+  activeUsersLast24h: number; activeUsersLast7d: number; avgRunsPerUser: number;
   usersByRunCount: Record<string, number>;
 }
 
 function computeAnalytics(users: UserProfile[], runs: RunData[], events: EventData[]): Analytics {
   const now = Date.now();
   const day = 86400000;
+  const n = runs.length;
 
-  const totalUsers = users.length;
-  const totalRuns = runs.length;
-  const avgScore = totalRuns ? Math.round(runs.reduce((s, r) => s + r.score, 0) / totalRuns) : 0;
-  const avgWave = totalRuns ? +(runs.reduce((s, r) => s + r.wave, 0) / totalRuns).toFixed(1) : 0;
+  const avgScore = n ? Math.round(runs.reduce((s, r) => s + r.score, 0) / n) : 0;
+  const avgWave = n ? +(runs.reduce((s, r) => s + r.wave, 0) / n).toFixed(1) : 0;
   const durRuns = runs.filter((r) => r.duration > 0);
   const avgDuration = durRuns.length ? Math.round(durRuns.reduce((s, r) => s + r.duration, 0) / durRuns.length) : 0;
-  const avgKillsPerRun = totalRuns ? Math.round(runs.reduce((s, r) => s + r.kills, 0) / totalRuns) : 0;
-  const survivalRate = totalRuns ? Math.round((runs.filter((r) => r.survived).length / totalRuns) * 100) : 0;
+  const avgKillsPerRun = n ? Math.round(runs.reduce((s, r) => s + r.kills, 0) / n) : 0;
+  const survivalRate = n ? Math.round((runs.filter((r) => r.survived).length / n) * 100) : 0;
 
-  // Mode distribution
   const modeDistribution: Record<string, number> = {};
-  for (const r of runs) modeDistribution[r.mode] = (modeDistribution[r.mode] ?? 0) + 1;
-
-  // Weapon popularity & win rate
   const weaponPopularity: Record<string, number> = {};
   const weaponWinRate: Record<string, { total: number; wins: number }> = {};
+  const deathWaveDistribution: Record<number, number> = {};
+  const chainDistribution: Record<number, number> = {};
+  const biomeDistribution: Record<string, number> = {};
+
   for (const r of runs) {
+    modeDistribution[r.mode] = (modeDistribution[r.mode] ?? 0) + 1;
     for (const w of r.equippedWeapons ?? []) {
       weaponPopularity[w] = (weaponPopularity[w] ?? 0) + 1;
       if (!weaponWinRate[w]) weaponWinRate[w] = { total: 0, wins: 0 };
       weaponWinRate[w].total++;
       if (r.survived) weaponWinRate[w].wins++;
     }
+    if (!r.survived && r.deathWave) deathWaveDistribution[r.deathWave] = (deathWaveDistribution[r.deathWave] ?? 0) + 1;
+    if (r.chainCount && r.chainCount > 0) chainDistribution[r.chainCount] = (chainDistribution[r.chainCount] ?? 0) + 1;
+    if (r.hexBiome) biomeDistribution[r.hexBiome] = (biomeDistribution[r.hexBiome] ?? 0) + 1;
   }
 
-  // Death wave distribution
-  const deathWaveDistribution: Record<number, number> = {};
   const deathRuns = runs.filter((r) => !r.survived && r.deathWave);
-  for (const r of deathRuns) deathWaveDistribution[r.deathWave!] = (deathWaveDistribution[r.deathWave!] ?? 0) + 1;
   const avgDeathWave = deathRuns.length ? +(deathRuns.reduce((s, r) => s + (r.deathWave ?? 0), 0) / deathRuns.length).toFixed(1) : 0;
-
-  // Quests
   const questRuns = runs.filter((r) => r.questsCompleted != null);
   const questsPerRun = questRuns.length ? +(questRuns.reduce((s, r) => s + r.questsCompleted, 0) / questRuns.length).toFixed(1) : 0;
-
-  // Chain distribution
-  const chainDistribution: Record<number, number> = {};
-  const chainRuns = runs.filter((r) => r.chainCount != null && r.chainCount > 0);
-  for (const r of chainRuns) chainDistribution[r.chainCount!] = (chainDistribution[r.chainCount!] ?? 0) + 1;
+  const chainRuns = runs.filter((r) => r.chainCount && r.chainCount > 0);
   const avgChainLength = chainRuns.length ? +(chainRuns.reduce((s, r) => s + (r.chainCount ?? 0), 0) / chainRuns.length).toFixed(1) : 0;
 
-  // Biome
-  const biomeDistribution: Record<string, number> = {};
-  for (const r of runs) if (r.hexBiome) biomeDistribution[r.hexBiome] = (biomeDistribution[r.hexBiome] ?? 0) + 1;
-
-  // Weapon unlock funnel
   const unlockEvents = events.filter((e) => e.event === 'weapon_unlock');
   const runsBeforeFirstUnlock = unlockEvents.length
-    ? Math.round(unlockEvents.reduce((s, e) => s + (e.totalRuns ?? 0), 0) / unlockEvents.length)
-    : 0;
-
+    ? Math.round(unlockEvents.reduce((s, e) => s + (e.totalRuns ?? 0), 0) / unlockEvents.length) : 0;
   const unlockByWeapon: Record<string, number[]> = {};
   for (const e of unlockEvents) {
     const wId = e.weaponId ?? 'unknown';
@@ -137,22 +437,11 @@ function computeAnalytics(users: UserProfile[], runs: RunData[], events: EventDa
     unlockByWeapon[wId].push(e.totalRuns ?? 0);
   }
   const weaponUnlockOrder = Object.entries(unlockByWeapon)
-    .map(([weapon, runsArr]) => ({
-      weapon,
-      avgRuns: Math.round(runsArr.reduce((a, b) => a + b, 0) / runsArr.length),
-    }))
+    .map(([weapon, arr]) => ({ weapon, avgRuns: Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) }))
     .sort((a, b) => a.avgRuns - b.avgRuns);
 
-  const usersWithMultipleWeapons = users.filter((u) => (u.unlockedWeapons?.length ?? 0) > 1).length;
-
-  // Economy
-  const avgScrapPerRun = totalRuns ? Math.round(runs.reduce((s, r) => s + (r.scrapEarned ?? 0), 0) / totalRuns) : 0;
-  const avgCoresPerRun = totalRuns ? +(runs.reduce((s, r) => s + (r.coresEarned ?? 0), 0) / totalRuns).toFixed(2) : 0;
-
-  // Retention
-  const activeUsersLast24h = users.filter((u) => u.lastSeen && (now - u.lastSeen.toDate().getTime()) < day).length;
-  const activeUsersLast7d = users.filter((u) => u.lastSeen && (now - u.lastSeen.toDate().getTime()) < day * 7).length;
-  const avgRunsPerUser = totalUsers ? +(users.reduce((s, u) => s + u.totalRuns, 0) / totalUsers).toFixed(1) : 0;
+  const avgScrapPerRun = n ? Math.round(runs.reduce((s, r) => s + (r.scrapEarned ?? 0), 0) / n) : 0;
+  const avgCoresPerRun = n ? +(runs.reduce((s, r) => s + (r.coresEarned ?? 0), 0) / n).toFixed(2) : 0;
 
   const usersByRunCount: Record<string, number> = { '1': 0, '2-5': 0, '6-10': 0, '11-25': 0, '25+': 0 };
   for (const u of users) {
@@ -165,296 +454,15 @@ function computeAnalytics(users: UserProfile[], runs: RunData[], events: EventDa
   }
 
   return {
-    totalUsers, totalRuns, avgScore, avgWave, avgDuration, avgKillsPerRun, survivalRate,
+    totalUsers: users.length, totalRuns: n, avgScore, avgWave, avgDuration, avgKillsPerRun, survivalRate,
     modeDistribution, weaponPopularity, weaponWinRate, deathWaveDistribution, avgDeathWave,
     questsPerRun, chainDistribution, avgChainLength, biomeDistribution,
-    runsBeforeFirstUnlock, weaponUnlockOrder, usersWithMultipleWeapons,
-    avgScrapPerRun, avgCoresPerRun, activeUsersLast24h, activeUsersLast7d,
-    avgRunsPerUser, usersByRunCount,
+    runsBeforeFirstUnlock, weaponUnlockOrder,
+    usersWithMultipleWeapons: users.filter((u) => (u.unlockedWeapons?.length ?? 0) > 1).length,
+    avgScrapPerRun, avgCoresPerRun,
+    activeUsersLast24h: users.filter((u) => u.lastSeen && (now - u.lastSeen.toDate().getTime()) < day).length,
+    activeUsersLast7d: users.filter((u) => u.lastSeen && (now - u.lastSeen.toDate().getTime()) < day * 7).length,
+    avgRunsPerUser: users.length ? +(users.reduce((s, u) => s + u.totalRuns, 0) / users.length).toFixed(1) : 0,
+    usersByRunCount,
   };
 }
-
-// --- Tabs ---
-function OverviewTab({ a }: { a: Analytics }) {
-  return (
-    <div>
-      <Section title="PLAYERS">
-        <Grid>
-          <Card label="TOTAL USERS" value={a.totalUsers} />
-          <Card label="ACTIVE 24H" value={a.activeUsersLast24h} />
-          <Card label="ACTIVE 7D" value={a.activeUsersLast7d} />
-          <Card label="AVG RUNS/USER" value={a.avgRunsPerUser} />
-        </Grid>
-      </Section>
-
-      <Section title="RETENTION (RUNS PER USER)">
-        <Grid>
-          {Object.entries(a.usersByRunCount).map(([bucket, count]) => (
-            <Card key={bucket} label={`${bucket} RUNS`} value={count} />
-          ))}
-        </Grid>
-      </Section>
-
-      <Section title="RUNS">
-        <Grid>
-          <Card label="TOTAL RUNS" value={a.totalRuns} />
-          <Card label="AVG SCORE" value={a.avgScore} />
-          <Card label="AVG WAVE" value={a.avgWave} />
-          <Card label="AVG DURATION" value={`${a.avgDuration}s`} />
-          <Card label="AVG KILLS/RUN" value={a.avgKillsPerRun} />
-          <Card label="SURVIVAL RATE" value={`${a.survivalRate}%`} />
-        </Grid>
-      </Section>
-
-      <Section title="MODE DISTRIBUTION">
-        <Grid>
-          {Object.entries(a.modeDistribution).map(([mode, count]) => (
-            <Card key={mode} label={mode.toUpperCase()} value={`${count} (${a.totalRuns ? Math.round(count / a.totalRuns * 100) : 0}%)`} />
-          ))}
-        </Grid>
-      </Section>
-
-      <Section title="ECONOMY">
-        <Grid>
-          <Card label="AVG SCRAP/RUN" value={a.avgScrapPerRun} color="#ffff00" />
-          <Card label="AVG CORES/RUN" value={a.avgCoresPerRun} color="#00ffff" />
-        </Grid>
-      </Section>
-    </div>
-  );
-}
-
-function ProgressionTab({ a, events }: { a: Analytics; events: EventData[] }) {
-  return (
-    <div>
-      <Section title="WEAPON UNLOCK FUNNEL">
-        <Grid>
-          <Card label="AVG RUNS BEFORE 1ST UNLOCK" value={a.runsBeforeFirstUnlock} />
-          <Card label="USERS WITH 2+ WEAPONS" value={`${a.usersWithMultipleWeapons} / ${a.totalUsers}`} />
-        </Grid>
-        {a.weaponUnlockOrder.length > 0 && (
-          <table style={S.table}>
-            <thead><tr><th style={S.th}>WEAPON</th><th style={S.th}>AVG RUNS TO UNLOCK</th></tr></thead>
-            <tbody>
-              {a.weaponUnlockOrder.map((w) => (
-                <tr key={w.weapon}><td style={S.td}>{w.weapon}</td><td style={S.td}>{w.avgRuns}</td></tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </Section>
-
-      <Section title="DEATH WAVE DISTRIBUTION">
-        <p style={S.hint}>Average death wave: {a.avgDeathWave}</p>
-        <div style={{ display: 'flex', gap: 2, alignItems: 'flex-end', height: 100, marginTop: 10 }}>
-          {Object.entries(a.deathWaveDistribution).sort((a, b) => +a[0] - +b[0]).map(([wave, count]) => {
-            const maxCount = Math.max(...Object.values(a.deathWaveDistribution));
-            return (
-              <div key={wave} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
-                <div style={{ background: '#00ff00', width: '80%', height: `${(count / maxCount) * 80}px`, minHeight: 2 }} />
-                <span style={{ fontSize: 9, color: '#005500', marginTop: 4 }}>W{wave}</span>
-                <span style={{ fontSize: 9, color: '#00ff00' }}>{count}</span>
-              </div>
-            );
-          })}
-        </div>
-      </Section>
-
-      <Section title="TERRITORY CHAINS">
-        <Grid>
-          <Card label="AVG CHAIN LENGTH" value={a.avgChainLength} />
-        </Grid>
-        <Grid>
-          {Object.entries(a.chainDistribution).sort((a, b) => +a[0] - +b[0]).map(([chain, count]) => (
-            <Card key={chain} label={`CHAIN ${chain}`} value={count} />
-          ))}
-        </Grid>
-      </Section>
-    </div>
-  );
-}
-
-function GameplayTab({ a }: { a: Analytics }) {
-  return (
-    <div>
-      <Section title="WEAPON POPULARITY">
-        <table style={S.table}>
-          <thead>
-            <tr><th style={S.th}>WEAPON</th><th style={S.th}>USAGE</th><th style={S.th}>WIN RATE</th></tr>
-          </thead>
-          <tbody>
-            {Object.entries(a.weaponPopularity).sort((a, b) => b[1] - a[1]).map(([weapon, count]) => {
-              const wr = a.weaponWinRate[weapon];
-              const winRate = wr ? Math.round((wr.wins / wr.total) * 100) : 0;
-              return (
-                <tr key={weapon}>
-                  <td style={S.td}>{weapon.toUpperCase()}</td>
-                  <td style={S.td}>{count} ({a.totalRuns ? Math.round(count / a.totalRuns * 100) : 0}%)</td>
-                  <td style={{ ...S.td, color: winRate > 50 ? '#00ff00' : '#ff3333' }}>{winRate}%</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </Section>
-
-      <Section title="QUESTS">
-        <Grid>
-          <Card label="AVG QUESTS/RUN" value={a.questsPerRun} />
-        </Grid>
-      </Section>
-
-      <Section title="BIOME DISTRIBUTION (TERRITORY)">
-        <Grid>
-          {Object.entries(a.biomeDistribution).sort((a, b) => b[1] - a[1]).map(([biome, count]) => (
-            <Card key={biome} label={biome.toUpperCase()} value={count} />
-          ))}
-        </Grid>
-      </Section>
-    </div>
-  );
-}
-
-function UsersTab({ users, selectedUser, setSelectedUser, userRuns }: {
-  users: UserProfile[]; selectedUser: string | null;
-  setSelectedUser: (uid: string | null) => void; userRuns: RunData[];
-}) {
-  return (
-    <div>
-      <Section title={`USERS (${users.length})`}>
-        <table style={S.table}>
-          <thead>
-            <tr>
-              <th style={S.th}>UID</th><th style={S.th}>RUNS</th><th style={S.th}>KILLS</th>
-              <th style={S.th}>BEST W</th><th style={S.th}>BEST S</th><th style={S.th}>SCRAP</th>
-              <th style={S.th}>CORES</th><th style={S.th}>HEXES</th><th style={S.th}>WEAPONS</th>
-              <th style={S.th}>LAST SEEN</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((u) => (
-              <tr key={u.uid} style={{ ...S.tr, ...(selectedUser === u.uid ? { background: '#003300' } : {}) }}
-                onClick={() => setSelectedUser(u.uid)}>
-                <td style={S.td}>{u.uid.slice(0, 10)}..</td>
-                <td style={S.td}>{u.totalRuns}</td>
-                <td style={S.td}>{u.totalKills}</td>
-                <td style={S.td}>{u.bestWave}</td>
-                <td style={S.td}>{u.bestScore}</td>
-                <td style={S.tdY}>{u.scrap}</td>
-                <td style={S.tdC}>{u.cores}</td>
-                <td style={S.td}>{u.conqueredHexes}</td>
-                <td style={S.td}>{u.unlockedWeapons?.length ?? 1}</td>
-                <td style={S.td}>{u.lastSeen?.toDate?.()?.toLocaleDateString() ?? '-'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Section>
-
-      {selectedUser && (
-        <Section title={`RUNS — ${selectedUser.slice(0, 10)}..`}>
-          <table style={S.table}>
-            <thead>
-              <tr>
-                <th style={S.th}>MODE</th><th style={S.th}>SCORE</th><th style={S.th}>WAVE</th>
-                <th style={S.th}>KILLS</th><th style={S.th}>LVL</th><th style={S.th}>DUR</th>
-                <th style={S.th}>SCRAP</th><th style={S.th}>OK</th><th style={S.th}>CHAIN</th>
-                <th style={S.th}>QUEST</th><th style={S.th}>WEAPONS</th>
-              </tr>
-            </thead>
-            <tbody>
-              {userRuns.map((r, i) => (
-                <tr key={i} style={S.tr}>
-                  <td style={S.td}>{r.mode}</td>
-                  <td style={S.td}>{r.score}</td>
-                  <td style={S.td}>{r.wave}</td>
-                  <td style={S.td}>{r.kills}</td>
-                  <td style={S.td}>{r.level}</td>
-                  <td style={S.td}>{r.duration ? `${r.duration}s` : '-'}</td>
-                  <td style={S.tdY}>{r.scrapEarned}</td>
-                  <td style={r.survived ? S.tdG : S.tdR}>{r.survived ? 'Y' : 'N'}</td>
-                  <td style={S.td}>{r.chainCount ?? 0}</td>
-                  <td style={S.td}>{r.questsCompleted ?? 0}</td>
-                  <td style={S.td}>{r.equippedWeapons?.join(', ')}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Section>
-      )}
-    </div>
-  );
-}
-
-function RunsTab({ runs }: { runs: RunData[] }) {
-  return (
-    <Section title={`RECENT RUNS (${runs.length})`}>
-      <table style={S.table}>
-        <thead>
-          <tr>
-            <th style={S.th}>USER</th><th style={S.th}>MODE</th><th style={S.th}>SCORE</th>
-            <th style={S.th}>WAVE</th><th style={S.th}>KILLS</th><th style={S.th}>DUR</th>
-            <th style={S.th}>OK</th><th style={S.th}>DIFF</th><th style={S.th}>CHAIN</th>
-            <th style={S.th}>WEAPONS</th><th style={S.th}>TIME</th>
-          </tr>
-        </thead>
-        <tbody>
-          {runs.map((r, i) => (
-            <tr key={i} style={S.tr}>
-              <td style={S.td}>{r.uid?.slice(0, 8)}..</td>
-              <td style={S.td}>{r.mode}</td>
-              <td style={S.td}>{r.score}</td>
-              <td style={S.td}>{r.wave}</td>
-              <td style={S.td}>{r.kills}</td>
-              <td style={S.td}>{r.duration ? `${r.duration}s` : '-'}</td>
-              <td style={r.survived ? S.tdG : S.tdR}>{r.survived ? 'Y' : 'N'}</td>
-              <td style={S.td}>{r.hexDifficulty ?? '-'}</td>
-              <td style={S.td}>{r.chainCount ?? 0}</td>
-              <td style={S.td}>{r.equippedWeapons?.join(', ')}</td>
-              <td style={S.td}>{r.timestamp?.toDate?.()?.toLocaleString() ?? '-'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </Section>
-  );
-}
-
-// --- Shared components ---
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return <div style={{ marginBottom: 24 }}><h2 style={S.section}>{title}</h2>{children}</div>;
-}
-function Grid({ children }: { children: React.ReactNode }) {
-  return <div style={S.grid}>{children}</div>;
-}
-function Card({ label, value, color }: { label: string; value: string | number; color?: string }) {
-  return (
-    <div style={S.card}>
-      <div style={{ ...S.cardValue, ...(color ? { color } : {}) }}>{value}</div>
-      <div style={S.cardLabel}>{label}</div>
-    </div>
-  );
-}
-
-// --- Styles ---
-const S: Record<string, React.CSSProperties> = {
-  container: { maxWidth: 1400, margin: '0 auto', padding: 20 },
-  title: { fontSize: 24, letterSpacing: 6, marginBottom: 20, color: '#00ff00' },
-  section: { fontSize: 14, letterSpacing: 3, marginBottom: 10, color: '#00ff00', borderBottom: '1px solid #002200', paddingBottom: 6 },
-  hint: { fontSize: 11, color: '#005500' },
-  tabBar: { display: 'flex', gap: 4, marginBottom: 20 },
-  tab: { padding: '8px 16px', background: 'transparent', border: '1px solid #002200', color: '#004400', fontFamily: 'monospace', fontSize: 12, cursor: 'pointer' },
-  tabActive: { borderColor: '#00ff00', color: '#00ff00', background: '#001100' },
-  grid: { display: 'flex', flexWrap: 'wrap' as const, gap: 10, marginBottom: 12 },
-  card: { border: '1px solid #002200', padding: '10px 16px', minWidth: 120 },
-  cardValue: { fontSize: 22, fontWeight: 'bold', color: '#00ff00' },
-  cardLabel: { fontSize: 9, color: '#004400', letterSpacing: 2, marginTop: 3 },
-  table: { width: '100%', borderCollapse: 'collapse' as const, fontSize: 11 },
-  th: { textAlign: 'left' as const, padding: 6, borderBottom: '1px solid #002200', color: '#004400', fontSize: 10 },
-  tr: { cursor: 'pointer' },
-  td: { padding: 6, borderBottom: '1px solid #0a0a0a', color: '#00ff00' },
-  tdY: { padding: 6, borderBottom: '1px solid #0a0a0a', color: '#ffff00' },
-  tdC: { padding: 6, borderBottom: '1px solid #0a0a0a', color: '#00ffff' },
-  tdG: { padding: 6, borderBottom: '1px solid #0a0a0a', color: '#00ff00' },
-  tdR: { padding: 6, borderBottom: '1px solid #0a0a0a', color: '#ff3333' },
-};

@@ -12,13 +12,13 @@ import {
 } from 'firebase/auth';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAfNsXm5e9GVJ5fK8Mnmhye-4VmSus46Yo",
-  authDomain: "otaa-2b14c.firebaseapp.com",
-  projectId: "otaa-2b14c",
-  storageBucket: "otaa-2b14c.firebasestorage.app",
-  messagingSenderId: "1002407809443",
-  appId: "1:1002407809443:web:15862070250a54a6d44a16",
-  measurementId: "G-CHDJ63X26E",
+  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
 const app = initializeApp(firebaseConfig);
